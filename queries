@@ -1,0 +1,28 @@
+SELECT Topic.title, Post.post_number, Person.name, Post.text, Post.posted_at FROM Topic
+                LEFT OUTER JOIN Post ON Topic.topic_id
+                LEFT OUTER JOIN Person ON Person.id = Topic.person_id
+                WHERE Topic.topic_id = 1
+                ORDER BY Post.posted_at ASC
+
+SELECT Forum.title, Topic.topic_id, Topic.title FROM Forum
+LEFT OUTER JOIN Topic ON Forum.forum_id
+WHERE Forum.forum_id = 1
+ORDER BY Topic.title ASC;
+
+SELECT Forum.title, Topic.topic_id, Topic.title FROM Topic
+JOIN Forum ON Forum.forum_id = Topic.forum_id
+WHERE Topic.forum_id = 1
+ORDER BY Topic.title ASC;
+
+
+SELECT Topic.title, Post.post_number, Person.name, Post.text, Post.posted_at FROM Post
+JOIN Topic ON Topic.topic_id = Post.topic_id
+JOIN Person ON Person.id = Post.person_id
+WHERE Post.topic_id = 3
+ORDER BY Post.posted_at ASC;
+
+
+SELECT COUNT(*) FROM Post
+JOIN Topic on Topic.topic_id = Post.topic_id
+WHERE Post.topic_id = 1;
+
