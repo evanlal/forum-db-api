@@ -2,6 +2,7 @@ package uk.ac.bris.cs.databases.cwk3;
 
 import java.sql.*;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -56,13 +57,20 @@ public class API implements APIProvider {
             ResultSet r = p.executeQuery();
 
             if (!r.next()) {
-                return Result.failure("User not found");
+                return Result.failure("User not found.");
+            }
+
+            // Takes care of null stuId
+            String stuId = r.getString("stuId");
+            if ( stuId == null) {
+                stuId = "";
             }
 
             PersonView personView = new PersonView(
                         r.getString("name"),
                         r.getString("username"),
-                        r.getString("stuId"));
+                        stuId
+            );
 
             return Result.success(personView);
 
@@ -81,14 +89,8 @@ public class API implements APIProvider {
             return Result.failure("Username cannot be empty.");
         }
 
-        if (studentId.isEmpty()) {
+        if (studentId != null && studentId.isEmpty()) {
             return Result.failure("StudentId cannot be empty.");
-        }
-
-        // check if user exists
-        Result<Long> personExists = HelperStatements.getPersonId(username, c);
-        if (personExists.isSuccess()) {
-            return Result.failure("User already exists.");
         }
 
         // create user
@@ -103,6 +105,12 @@ public class API implements APIProvider {
             c.commit();
             return Result.success();
         } catch (SQLException e) {
+            // Check for integrity constraint violation(23---)
+            // Duplicate entry means the username is taken
+            if (e.getSQLState().startsWith("23")) {
+                return Result.failure("Username is taken.");
+            }
+
             try {
                 c.rollback();
             } catch (SQLException f) {
@@ -141,24 +149,10 @@ public class API implements APIProvider {
     @Override
     public Result createForum(String title) {
         if (title == null || title.isEmpty()) {
-            return Result.failure("name cannot be empty");
+            return Result.failure("Forum title cannot be empty.");
         }
 
-        // check if forum exists
-        final String STMT_1 = "SELECT title FROM Forum WHERE title = ?";
-
-        try (PreparedStatement p = c.prepareStatement(STMT_1)) {
-            p.setString(1, title);
-            ResultSet r = p.executeQuery();
-
-            if (r.next() ) {
-                return Result.failure("A forum with the same title already exists.");
-            }
-        } catch (SQLException e) {
-            return Result.fatal(e.getMessage());
-        }
-
-        // create forum
+        // Create forum
         final String STMT_2 = "INSERT INTO Forum (title) VALUES (?)";
 
         try (PreparedStatement p = c.prepareStatement(STMT_2)) {
@@ -168,6 +162,12 @@ public class API implements APIProvider {
             c.commit();
             return Result.success();
         } catch (SQLException e) {
+            // Check for integrity constraint violation(23---)
+            // Duplicate entry means a forum with same title already exists
+            if (e.getSQLState().startsWith("23")) {
+                return Result.failure("A topic with the same title already exists.");
+            }
+
             try {
                 c.rollback();
             } catch (SQLException f) {
@@ -280,7 +280,7 @@ public class API implements APIProvider {
         String topicTitle = topicExists.getValue().toString();
 
         // Get the posts of a topic in the order they were created
-        final String STMT = "SELECT Post.post_number, Person.name, Post.text, Post.posted_at FROM Post " +
+        final String STMT = "SELECT Post.text, Post.posted_at, Person.name FROM Post " +
                 "JOIN Person ON Person.id = Post.person_id " +
                 "WHERE Post.topic_id = ? " +
                 "ORDER BY Post.posted_at ASC";
@@ -290,16 +290,24 @@ public class API implements APIProvider {
             ResultSet r = p.executeQuery();
 
             List<SimplePostView> simplePostViews = new ArrayList<>();
+
+            int postNumber = 0;
             while (r.next()){
+                postNumber++;
+
                 SimplePostView simplePostView = new SimplePostView(
-                        r.getInt("Post.post_number"),
+                        postNumber,
                         r.getString("Person.name"),
                         r.getString("Post.text"),
-                        r.getTimestamp("Post.posted_at").toString()
+                        r.getTimestamp("Post.posted_at")
+                                .toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
                 );
                 simplePostViews.add(simplePostView);
             }
-
+            // Avoiding exception in case list is empty
+            if (simplePostViews.isEmpty()) {
+                return Result.failure("No posts found.");
+            }
             return Result.success(new SimpleTopicView(topicId, topicTitle, simplePostViews));
 
         } catch (SQLException e) {
@@ -309,13 +317,12 @@ public class API implements APIProvider {
     
     @Override
     public Result<PostView> getLatestPost(long topicId) {
-        // check if topic exists
+        // Check if topic exists
         Result topicExists =   HelperStatements.topicExists(topicId, c);
         if (!topicExists.isSuccess()) {
             return topicExists;
         }
 
-        // TODO CHECK
         final String STMT = "SELECT Post.post_id, Post.forum_id, Post.post_number, Post.posted_at, Post.text, " +
                 "Post.total_likes, Person.name, Person.username FROM Post " +
                 "JOIN Person ON Post.person_id = Person.id " +
@@ -334,7 +341,8 @@ public class API implements APIProvider {
                         r.getString("Person.name"),
                         r.getString("Person.username"),
                         r.getString("Post.test"),
-                        r.getString("Post.posted_at"),
+                        r.getTimestamp("Post.posted_at")
+                                .toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
                         r.getInt("Post.total_likes")
                         );
                 return Result.success(postView);
@@ -354,9 +362,6 @@ public class API implements APIProvider {
         if (text == null || text.isEmpty()) {
             return Result.failure("Text cannot be empty.");
         }
-
-        // Don't check if topic exists, if wrong topicId it will violate the foreign constraint
-        // with the appropriate constraint error message
 
         // Retrieve person id if exists
         Result<Long> personExists = HelperStatements.getPersonId(username, c);
@@ -379,6 +384,10 @@ public class API implements APIProvider {
             return Result.success();
 
         } catch (SQLException e) {
+            if (e.getMessage().contains("CONSTRAINT `fk_post_nonexistent_topicid`")) {
+                return Result.failure("Topic does not exist.");
+            }
+
             try {
                 c.rollback();
             } catch (SQLException f) {
@@ -402,9 +411,6 @@ public class API implements APIProvider {
             return Result.failure("Text cannot be empty.");
         }
 
-        // Don't check if forum exists, if wrong forumId it will violate the foreign constraint
-        // with the appropriate constraint error message
-
         // Check if person exists and retrieve person id
         Result<Long> personExists = HelperStatements.getPersonId(username, c);
         if (!personExists.isSuccess()) {
@@ -426,6 +432,10 @@ public class API implements APIProvider {
             return Result.success();
 
         } catch (SQLException e) {
+            if (e.getMessage().contains("CONSTRAINT `fk_topic_nonexistent_forumid`")) {
+                return Result.failure("Forum does not exist.");
+            }
+
             try {
                 c.rollback();
             } catch (SQLException f) {
@@ -445,7 +455,6 @@ public class API implements APIProvider {
         }
 
         // Get post count
-        // TODO: check
         final String STMT_1 = "SELECT COUNT(*) AS totalPosts FROM Post WHERE topic_id = ?";
         try(PreparedStatement p = c.prepareStatement(STMT_1)) {
             p.setLong(1,topicId);
@@ -488,11 +497,18 @@ public class API implements APIProvider {
             p.executeQuery();
             c.commit();
         } catch (SQLException e) {
+            // Check for integrity constraint violation(23---)
+            // Duplicate entry means the like already exists
+            if (e.getSQLState().startsWith("23")) {
+                return Result.success();
+            }
+
             try {
                 c.rollback();
             } catch (SQLException f) {
                 return Result.fatal(f.getMessage());
             }
+
             return Result.fatal(e.getMessage());
         }
 
@@ -506,10 +522,11 @@ public class API implements APIProvider {
                 "ORDER BY posted_at ASC " +
                 "LIMIT 1 OFFSET ?";
 
+        int postOffset = post -1;
         Long postId;
         try(PreparedStatement p = c.prepareStatement(STMT_1)) {
             p.setLong(1, topicId);
-            p.setInt(2, post);
+            p.setInt(2, postOffset);
             ResultSet r = p.executeQuery();
 
             if (!r.next()) {
@@ -529,19 +546,19 @@ public class API implements APIProvider {
         }
         Long personId = personExists.getValue();
 
-        // Perform like action
-        String STMT_3A;
-        String STMT_3B;
+        // Perform like/unlike action
+        String STMT_2A;
+        String STMT_2B;
         if (like) {
-            STMT_3A = "INSERT INTO PostLikes(post_id, person_id) VALUES (?,?)";
-            STMT_3B = "UPDATE Post SET total_likes = total_likes + 1 WHERE post_id = ?";
+            STMT_2A = "INSERT INTO PostLikes(post_id, person_id) VALUES (?,?)";
+            STMT_2B = "UPDATE Post SET total_likes = total_likes + 1 WHERE post_id = ?";
         } else {
-            STMT_3A = "DELETE FROM PostLikes WHERE post_id = ? AND person_id = ?";
-            STMT_3B = "UPDATE Post SET total_likes = total_likes - 1 WHERE post_id = ?";
+            STMT_2A = "DELETE FROM PostLikes WHERE post_id = ? AND person_id = ?";
+            STMT_2B = "UPDATE Post SET total_likes = total_likes - 1 WHERE post_id = ?";
         }
 
-        try(PreparedStatement p = c.prepareStatement(STMT_3A);
-            PreparedStatement p2 = c.prepareStatement(STMT_3B)) {
+        try(PreparedStatement p = c.prepareStatement(STMT_2A);
+            PreparedStatement p2 = c.prepareStatement(STMT_2B)) {
             p.setLong(1, postId);
             p.setLong(2, personId);
 
@@ -555,18 +572,25 @@ public class API implements APIProvider {
 
             return Result.success();
         } catch (SQLException e) {
+            // Check for integrity constraint violation(23---)
+            // Duplicate entry means the like already exists
+            if (e.getSQLState().startsWith("23")) {
+                return Result.success();
+            }
+
             try {
                 c.rollback();
             } catch (SQLException f) {
                 return Result.fatal(f.getMessage());
             }
+
             return Result.fatal(e.getMessage());
         }
     }
 
     @Override
     public Result<List<PersonView>> getLikers(long topicId) {
-        // check if topic exists
+        // Check if topic exists
         Result topicExists =   HelperStatements.topicExists(topicId, c);
         if (!topicExists.isSuccess()) {
             return topicExists;
@@ -650,7 +674,7 @@ public class API implements APIProvider {
                         r.getString("Person.name"),
                         r.getString("Person.username"),
                         r.getString("text"),
-                        r.getTimestamp("Post.posted_at").toString(),
+                        r.getTimestamp("Post.posted_at").toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
                         r.getInt("Post.total_likes")
                 );
 
@@ -660,7 +684,11 @@ public class API implements APIProvider {
             return Result.fatal(e.getMessage());
         }
 
-        // TODO: 5/1/18 what if empty
+        // Avoid exception in case of empty list
+        if (postViews.isEmpty()) {
+            return Result.failure("No posts found.");
+        }
+
         // Construct topic view
         TopicView topicView = new TopicView(forumId, topicId, forumName, topicTitle, postViews);
 
