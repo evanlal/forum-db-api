@@ -5,7 +5,7 @@ SELECT Topic.title, Post.post_number, Person.name, Post.text, Post.posted_at FRO
                 ORDER BY Post.posted_at ASC
 
 SELECT Forum.title, Topic.topic_id, Topic.title FROM Forum
-LEFT OUTER JOIN Topic ON Forum.forum_id
+LEFT OUTER JOIN Topic ON Forum.forum_id = Topic.forum_id
 WHERE Forum.forum_id = 1
 ORDER BY Topic.title ASC;
 
@@ -26,3 +26,255 @@ SELECT COUNT(*) FROM Post
 JOIN Topic on Topic.topic_id = Post.topic_id
 WHERE Post.topic_id = 1;
 
+
+SELECT Topic.forum_id, Forum.title FROM Topic
+JOIN Forum ON Topic.forum_id = Forum.forum_id
+WHERE Topic.topic_id = ?
+
+
+SELECT Post.post_number, Person.name, Person.username, Post.text, Post.posted_at, Post.total_likes FROM Post
+JOIN Person ON Post.person_id = Person.id
+WHERE Post.topic_id = 1;
+
+final String STMT = "SELECT forum_id, title FROM Forum";
+        final String STMT_2 =
+                "SELECT topic_id, forum_id, title FROM Topic " +
+                "WHERE forum_id = ? " +
+                "ORDER BY last_post_time DESC " +
+                "LIMIT 1";
+
+SELECT Forum.forum_id, Forum.title, Topic.title FROM Forum
+LEFT OUTER JOIN Topic ON Forum.forum_id = Topic.forum_id
+GROUP BY Forum.forum_id, Forum.title, Topic.title
+ORDER BY Topic.last_post_time DESC
+LIMIT 1;
+
+-----
+SELECT Forum.title, Forum.forum_id, t1.topictitle, MAX(t1.lastpost) FROM Forum
+LEFT JOIN
+
+SELECT Topic.
+(SELECT Topic.forum_id AS forumid, Topic.topic_id, MAX(Post.posted_at) AS lastpost FROM Topic
+JOIN Post ON Topic.topic_id = Post.topic_id
+GROUP BY Topic.forum_id, Topic.topic_id) as t1
+
+SELECT Forum.ti
+ON Forum.forum_id = t1.forumid
+GROUP BY Forum.title, Forum.forum_id;
+----
+
+-- When last post on topic
+SELECT Forum_id, Forum_title, Topic_id, Topic_title FROM
+
+
+
+(SELECT Topic.forum_id AS forum_id, Topic.topic_id AS topic_id, MAX(Post.posted_at) AS lastpost FROM Topic
+JOIN Post ON Topic.topic_id = Post.topic_id
+GROUP BY Topic.forum_id, Topic.topic_id) as t1
+GROUP BY 
+
+
+
+
+
+SELECT Forum.forum_id, Forum.forum_title, t1.Topic_id, t1.Topic_title, MAX(t1.lastpost) FROM Forum
+JOIN 
+(SELECT Topic.forum_id AS forum_id, Topic.topic_id AS topic_id, MAX(Post.posted_at) AS lastpost FROM Topic
+JOIN Post ON Topic.topic_id = Post.topic_id
+GROUP BY Topic.forum_id, Topic.topic_id) as t1
+ON Forum.forum_id = t1.forum_id AND 
+
+SELECT 
+
+
+
+-----
+
+
+"SELECT Topic.topic_id, Topic.title, MAX(Post.posted_at) AS lastpost FROM Topic " +
+"JOIN Post ON Topic.topic_id = Post.topic_id " +
+"WHERE Topic.forum_id = ? " +
+"GROUP BY Topic.topic_id, Topic.title " +
+"ORDER BY lastpost DESC " +
+"LIMIT 1"
+
+
+----
+
+SELECT Topic.forum_id
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+getForum alternative
+    public Result<ForumView> getForum(long id) {
+        final String STMT = "SELECT Forum.title, Topic.topic_id, Topic.title FROM Forum " +
+                "LEFT OUTER JOIN Topic ON Forum.forum_id = Topic.forum_id " +
+                "WHERE Forum.forum_id = ? " +
+                "ORDER BY Topic.title ASC";
+
+        try (PreparedStatement p = c.prepareStatement(STMT)) {
+            p.setLong(1, id);
+            ResultSet r = p.executeQuery();
+
+            // If result set is empty the forum does not exists
+            if (!r.isBeforeFirst()) {
+                return Result.failure("forum not exists");
+            }
+
+            String forumTitle = "";
+            List<SimpleTopicSummaryView> topicSummaryViews = new ArrayList<>();
+            while(r.next()) {
+                forumTitle = r.getString("Forum.title");
+                
+                Long topicId = r.getLong("Topic.topic_id");
+                String topicTitle = r.getString("Topic.title");
+                
+                SimpleTopicSummaryView topicSummaryView = new SimpleTopicSummaryView(
+                        topicId,
+                        id,
+                        topicTitle
+                );
+
+                topicSummaryViews.add(topicSummaryView);
+            }
+
+            ForumView forumView = new ForumView(id, forumTitle,topicSummaryViews);
+            return Result.success(forumView);
+
+        } catch (SQLException e) {
+            return Result.fatal(e.getMessage());
+        }
+
+    }
+
+@Override
+    public Result<SimpleTopicView> getSimpleTopic(long topicId) {
+        final String STMT = "SELECT Topic.title, Post.post_number, Person.name, Post.text, Post.posted_at FROM Post " +
+                "JOIN Topic ON Topic.topic_id = Post.topic_id " +
+                "JOIN Person ON Person.id = Post.person_id " +
+                "WHERE Post.topic_id = ? " +
+                "ORDER BY Post.posted_at ASC";
+
+        try(PreparedStatement p = c.prepareStatement(STMT)) {
+            p.setLong(1, topicId);
+            ResultSet r = p.executeQuery();
+
+            if(!r.isBeforeFirst()) {
+                return Result.failure("topic does not exists");
+            }
+
+            // get topic title
+            r.next();
+            String topicTitle = r.getString("Topic.title");
+            List<SimplePostView> simplePostViews = new ArrayList<>();
+
+            do {
+                SimplePostView simplePostView = new SimplePostView(
+                        r.getInt("Post.post_number"),
+                        r.getString("Person.name"),
+                        r.getString("Post.text"),
+                        r.getTimestamp("Post.posted_at").toString()
+                );
+                simplePostViews.add(simplePostView);
+            } while (r.next());
+
+            return Result.success(new SimpleTopicView(topicId, topicTitle, simplePostViews));
+        } catch (SQLException e) {
+            return Result.fatal(e.getMessage());
+        }
+    } 
+
+
+@Override
+    public Result<PostView> getLatestPost(long topicId) {
+        // check if topic exists
+        Result topicExists =   HelperStatements.topicExists(topicId, c);
+        if (!topicExists.isSuccess()) {
+            return topicExists;
+        }
+        
+        // TODO CHECK
+        final String STMT_2 = "SELECT Post.post_id, Post.forum_id, Post.post_number, Post.posted_at, Post.text, " +
+                "Post.total_likes, Person.name, Person.username FROM Post " +
+                "JOIN Person ON Post.person_id = Person.id " +
+                "WHERE Post.topic_id = ? " +
+                "ORDER BY Post.posted_at DESC " +
+                "LIMIT 1";
+        final String STMT_3 = "SELECT Count(*) AS likes FROM PostLikes WHERE post_id = ?";
+
+        try(PreparedStatement p = c.prepareStatement(STMT_2);
+        PreparedStatement p2 = c.prepareStatement(STMT_3)) {
+            p.setLong(1, topicId);
+            ResultSet r = p.executeQuery();
+
+            if(r.next()) {
+                Long postId = r.getLong("post_id");
+
+                // count likes
+                p2.setLong(1, postId);
+                ResultSet r2 = p2.executeQuery();
+                int likes = 0;
+                if (r2.next()) {
+                    likes = r2.getInt("likes");
+                }
+
+                // create PostView
+                PostView postView = new PostView(r.getLong("Post.forum_id"),
+                        topicId,
+                        r.getInt("Post.post_number"),
+                        r.getString("Person.name"),
+                        r.getString("Person.username"),
+                        r.getString("Post.test"),
+                        r.getString("Post.posted_at"),
+                        likes
+                        );
+                return Result.success(postView);
+            } else {
+                return Result.failure("no latest post found");
+            }
+        } catch (SQLException e) {
+            return Result.fatal(e.getMessage());
+        }
+    }
+
+// Check if like exists
+        boolean likeExists;
+
+        final String STMT_2 = "SELECT * FROM PostLikes WHERE post_id = ? AND person_id = ?";
+        try(PreparedStatement p = c.prepareStatement(STMT_2)) {
+            p.setLong(1, postId);
+            p.setLong(2, personId);
+
+            ResultSet r = p.executeQuery();
+            likeExists = r.next();
+
+        } catch (SQLException e) {
+            return Result.fatal(e.getMessage());
+        }
