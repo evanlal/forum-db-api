@@ -22,7 +22,6 @@ CREATE TABLE Topic (
 	forum_id INTEGER NOT NULL,
 	person_id INTEGER NOT NULL,
 	title VARCHAR(255) NOT NULL,
-	text VARCHAR(2048) NOT NULL,
 	CONSTRAINT fk_topic_nonexistent_forumid FOREIGN KEY (forum_id) REFERENCES Forum(forum_id),
 	CONSTRAINT fk_topic_nonexistent_personid FOREIGN KEY (person_id) REFERENCES Person(id)
 );

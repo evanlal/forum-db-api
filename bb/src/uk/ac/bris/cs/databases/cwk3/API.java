@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.sun.jna.platform.win32.WinNT;
 import uk.ac.bris.cs.databases.api.*;
 
 /**
@@ -152,22 +151,26 @@ public class API implements APIProvider {
             return Result.failure("Forum title cannot be empty.");
         }
 
+        // Check if exists
+        final String STMT_1 = "SELECT forum_id FROM Forum WHERE title = ?";
         // Create forum
         final String STMT_2 = "INSERT INTO Forum (title) VALUES (?)";
 
-        try (PreparedStatement p = c.prepareStatement(STMT_2)) {
-            p.setString(1, title);
+        try (PreparedStatement p1 = c.prepareStatement(STMT_1);
+                PreparedStatement p2 = c.prepareStatement(STMT_2)) {
 
-            p.executeQuery();
-            c.commit();
-            return Result.success();
-        } catch (SQLException e) {
-            // Check for integrity constraint violation(23---)
-            // Duplicate entry means a forum with same title already exists
-            if (e.getSQLState().startsWith("23")) {
+            p1.setString(1, title);
+            ResultSet r = p1.executeQuery();
+            if (r.next()) {
                 return Result.failure("A forum with the same title already exists.");
             }
 
+            p2.setString(1, title);
+            p2.executeQuery();
+            c.commit();
+
+            return Result.success();
+        } catch (SQLException e) {
             try {
                 c.rollback();
             } catch (SQLException f) {
@@ -427,14 +430,30 @@ public class API implements APIProvider {
         Long personId = personExists.getValue();
 
         // Create topic
-        String STMT_3 = "INSERT INTO Topic(forum_id, person_id, title, text) VALUES(?, ?, ?, ?)";
+        String STMT_1 = "INSERT INTO Topic(forum_id, person_id, title) VALUES(?, ?, ?)";
 
-        try(PreparedStatement p = c.prepareStatement(STMT_3)) {
+        // Create post
+        final String STMT_2 = "INSERT INTO Post(topic_id, person_id, posted_at, text) VALUES(?, ?, ?, ?)";
+
+        try(PreparedStatement p = c.prepareStatement(STMT_1, Statement.RETURN_GENERATED_KEYS);
+        PreparedStatement p2 = c.prepareStatement(STMT_2)) {
             p.setLong(1, forumId);
             p.setLong(2, personId);
             p.setString(3, title);
-            p.setString(4, text);
             p.executeQuery();
+
+            // Get topic id
+            ResultSet generatedKeys = p.getGeneratedKeys();
+            if (!generatedKeys.next()) {
+                return Result.fatal("Post not created.");
+            }
+
+            Long postId = generatedKeys.getLong("post_id");
+            p2.setLong(1, postId);
+            p2.setLong(2, personId);
+            p2.setTimestamp(3, Timestamp.from(Instant.now()));
+            p2.setString(4, text);
+            p2.executeQuery();
             c.commit();
 
             return Result.success();

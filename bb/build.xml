@@ -12,7 +12,6 @@
     </target>
     <target name="run">
         <java classname="uk.ac.bris.cs.databases.web.Server">
-            <arg value="${user.home}/mysql/mysql.sock" />
             <classpath>
                 <fileset dir="lib">
                     <include name="*.jar" />
