@@ -278,3 +278,13 @@ getForum alternative
         } catch (SQLException e) {
             return Result.fatal(e.getMessage());
         }
+
+ALTER TABLE PostLikes ADD CONSTRAINT post_like_exists UNIQUE (post_id, person_id);
+
+
+"SELECT Post.post_id, Post.posted_at, Post.text, Post.total_likes, Topic.forum_id, Person.name, Person.username FROM Post " +
+"JOIN Topic ON Post.topic_id = Topic.topic_id " +
+"JOIN Person ON Post.person_id = Person.id " +
+"WHERE Post.topic_id = 1 " +
+"ORDER BY Post.posted_at DESC " +
+"LIMIT 1;"

@@ -165,7 +165,7 @@ public class API implements APIProvider {
             // Check for integrity constraint violation(23---)
             // Duplicate entry means a forum with same title already exists
             if (e.getSQLState().startsWith("23")) {
-                return Result.failure("A topic with the same title already exists.");
+                return Result.failure("A forum with the same title already exists.");
             }
 
             try {
@@ -323,21 +323,29 @@ public class API implements APIProvider {
             return topicExists;
         }
 
-        final String STMT = "SELECT Post.post_id, Post.forum_id, Post.post_number, Post.posted_at, Post.text, " +
-                "Post.total_likes, Person.name, Person.username FROM Post " +
-                "JOIN Person ON Post.person_id = Person.id " +
-                "WHERE Post.topic_id = ? " +
-                "ORDER BY Post.posted_at DESC " +
-                "LIMIT 1";
+        // Get latest post
+        final String STMT_1 =
+                "SELECT Post.post_id, Post.posted_at, Post.text, Post.total_likes, Topic.forum_id, Person.name, Person.username FROM Post " +
+                        "JOIN Topic ON Post.topic_id = Topic.topic_id " +
+                        "JOIN Person ON Post.person_id = Person.id " +
+                        "WHERE Post.topic_id = ? " +
+                        "ORDER BY Post.posted_at DESC " +
+                        "LIMIT 1;";
 
-        try(PreparedStatement p = c.prepareStatement(STMT)) {
+        // Get the number of posts in the topic for postNumber
+        final String STMT_2 = "SELECT COUNT(*) AS post_number FROM Post WHERE topic_id = ?";
+
+        try(PreparedStatement p = c.prepareStatement(STMT_1);
+        PreparedStatement p2 = c.prepareStatement(STMT_2)) {
             p.setLong(1, topicId);
+            p2.setLong(1, topicId);
             ResultSet r = p.executeQuery();
+            ResultSet r2 = p.executeQuery();
 
-            if(r.next()) {
+            if(r.next() && r2.next()) {
                 PostView postView = new PostView(r.getLong("Post.forum_id"),
                         topicId,
-                        r.getInt("Post.post_number"),
+                        r2.getInt("post_number"),
                         r.getString("Person.name"),
                         r.getString("Person.username"),
                         r.getString("Post.test"),
