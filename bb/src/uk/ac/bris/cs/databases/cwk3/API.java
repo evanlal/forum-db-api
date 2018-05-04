@@ -328,7 +328,8 @@ public class API implements APIProvider {
 
         // Get latest post
         final String STMT_1 =
-                "SELECT Post.post_id, Post.posted_at, Post.text, Post.total_likes, Topic.forum_id, Person.name, Person.username FROM Post " +
+                "SELECT Post.post_id, Post.posted_at, Post.text, Post.total_likes, " +
+                        "Topic.forum_id, Person.name, Person.username FROM Post " +
                         "JOIN Topic ON Post.topic_id = Topic.topic_id " +
                         "JOIN Person ON Post.person_id = Person.id " +
                         "WHERE Post.topic_id = ? " +
@@ -701,7 +702,8 @@ public class API implements APIProvider {
                         r.getString("Person.name"),
                         r.getString("Person.username"),
                         r.getString("text"),
-                        r.getTimestamp("Post.posted_at").toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+                        r.getTimestamp("Post.posted_at")
+                                .toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
                         r.getInt("Post.total_likes")
                 );
 
