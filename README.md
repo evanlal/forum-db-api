@@ -29,5 +29,5 @@ Typically, on a busy forum, poorly planned queries will result in a significant 
 ## License
 Written by Evan Lalopoulos <evan.lalopoulos.2017@my.bristol.ac.uk>  
 University of Bristol, May 2018  
-Copyright (C) - All rights reserved.  
-Unauthorized copying of this file is strictly prohibited.  
+Copyright (C) 2018 - All rights reserved.  
+Unauthorized copying is strictly prohibited.  
