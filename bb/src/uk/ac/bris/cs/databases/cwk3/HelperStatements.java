@@ -1,3 +1,9 @@
+/*
+ * Written by Evan Lalopoulos <evan.lalopoulos.2017@my.bristol.ac.uk>
+ * Copyright (C) 2018 - All rights reserved.
+ * Unauthorized copying of this file is strictly prohibited.
+ */
+
 package uk.ac.bris.cs.databases.cwk3;
 
 import uk.ac.bris.cs.databases.api.Result;

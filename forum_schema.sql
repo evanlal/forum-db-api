@@ -1,3 +1,9 @@
+/*
+ * Written by Evan Lalopoulos <evan.lalopoulos.2017@my.bristol.ac.uk>
+ * Copyright (C) 2018 - All rights reserved.
+ * Unauthorized copying of this file is strictly prohibited.
+ */
+
 DROP TABLE IF EXISTS PostLikes;
 DROP TABLE IF EXISTS TopicLikes;
 DROP TABLE IF EXISTS Post;

@@ -1,3 +1,9 @@
+/*
+ * Written by Evan Lalopoulos <evan.lalopoulos.2017@my.bristol.ac.uk>
+ * Copyright (C) 2018 - All rights reserved.
+ * Unauthorized copying of this file is strictly prohibited.
+ */
+
 package uk.ac.bris.cs.databases.cwk3;
 
 import java.sql.*;
@@ -17,13 +23,13 @@ import uk.ac.bris.cs.databases.api.*;
 public class API implements APIProvider {
 
     private final Connection c;
-    
+
     public API(Connection c) {
         this.c = c;
     }
 
     /* A.1 */
-    
+
     @Override
     public Result<Map<String, String>> getUsers() {
         final String STMT = "SELECT name, username FROM Person";
@@ -77,7 +83,7 @@ public class API implements APIProvider {
             return Result.fatal(e.getMessage());
         }
     }
-    
+
     @Override
     public Result addNewPerson(String name, String username, String studentId) {
         if (name == null || name.isEmpty()) {
@@ -118,7 +124,7 @@ public class API implements APIProvider {
             return Result.fatal(e.getMessage());
         }
     }
-    
+
     /* A.2 */
 
     @Override
@@ -179,9 +185,9 @@ public class API implements APIProvider {
             return Result.fatal(e.getMessage());
         }
     }
- 
+
     /* A.3 */
- 
+
     @Override
     public Result<List<ForumSummaryView>> getForums() {
         // Get all forums
@@ -235,7 +241,7 @@ public class API implements APIProvider {
             return Result.fatal(e.getMessage());
         }
     }
-    
+
     @Override
     public Result<ForumView> getForum(long id) {
         // Check if forum exists
@@ -316,8 +322,8 @@ public class API implements APIProvider {
         } catch (SQLException e) {
             return Result.fatal(e.getMessage());
         }
-    }    
-    
+    }
+
     @Override
     public Result<PostView> getLatestPost(long topicId) {
         // Check if topic exists
@@ -410,7 +416,7 @@ public class API implements APIProvider {
         }
 
     }
-     
+
     @Override
     public Result createTopic(long forumId, String username, String title, String text) {
         if (username == null || username.isEmpty()) {
@@ -473,7 +479,7 @@ public class API implements APIProvider {
             return Result.fatal(e.getMessage());
         }
     }
-    
+
     @Override
     public Result<Integer> countPostsInTopic(long topicId) {
         // check if topic exists
@@ -497,7 +503,7 @@ public class API implements APIProvider {
     }
 
     /* B.1 */
-       
+
     @Override
     public Result likeTopic(String username, long topicId, boolean like) {
         if (username == null || username.isEmpty()) {
@@ -542,7 +548,7 @@ public class API implements APIProvider {
 
         return Result.success();
     }
-    
+
     @Override
     public Result likePost(String username, long topicId, int post, boolean like) {
         // Get post id if exists
